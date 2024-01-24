@@ -8,7 +8,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 
 find_package(OpenCV REQUIRED)
 
-
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
@@ -16,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   cv_bridge
   message_filters
+  livox_ros_driver2
 )
 
 find_package(Eigen3 REQUIRED)

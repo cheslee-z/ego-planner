@@ -16,6 +16,7 @@ find_package(catkin REQUIRED
     roslint
     cv_bridge
     message_filters
+    livox_ros_driver2
 )
 
 ## Find system libraries

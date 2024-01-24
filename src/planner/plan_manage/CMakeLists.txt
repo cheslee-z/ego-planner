@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   traj_utils
   message_generation
   cv_bridge
+  livox_ros_driver2
 )
 
 # catkin_package(CATKIN_DEPENDS message_runtime)
