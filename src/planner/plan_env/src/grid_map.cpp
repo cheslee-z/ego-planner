@@ -217,92 +217,105 @@ void GridMap::projectDepthImage()
   // md_.proj_points_.clear();
   md_.proj_points_cnt = 0;
 
-  uint16_t *row_ptr;
-  // int cols = current_img_.cols, rows = current_img_.rows;
-  int cols = md_.depth_image_.cols;
-  int rows = md_.depth_image_.rows;
-  int skip_pix = mp_.skip_pixel_;
-
-  double depth;
-
-  Eigen::Matrix3d camera_r = md_.camera_r_m_;
-
-  if (!mp_.use_depth_filter_)
+  if (1)
   {
-    for (int v = 0; v < rows; v+=skip_pix)
+    uint16_t *row_ptr;
+    // int cols = current_img_.cols, rows = current_img_.rows;
+    int cols = md_.depth_image_.cols;
+    int rows = md_.depth_image_.rows;
+    int skip_pix = mp_.skip_pixel_;
+
+    double depth;
+
+    Eigen::Matrix3d camera_r = md_.camera_r_m_;
+
+    if (!mp_.use_depth_filter_)
     {
-      row_ptr = md_.depth_image_.ptr<uint16_t>(v);
-
-      for (int u = 0; u < cols; u+=skip_pix)
+      for (int v = 0; v < rows; v+=skip_pix)
       {
+        row_ptr = md_.depth_image_.ptr<uint16_t>(v);
 
-        Eigen::Vector3d proj_pt;
-        depth = (*row_ptr++) / mp_.k_depth_scaling_factor_;
-        proj_pt(0) = (u - mp_.cx_) * depth / mp_.fx_;
-        proj_pt(1) = (v - mp_.cy_) * depth / mp_.fy_;
-        proj_pt(2) = depth;
+        for (int u = 0; u < cols; u+=skip_pix)
+        {
 
-        proj_pt = camera_r * proj_pt + md_.camera_pos_;
+          Eigen::Vector3d proj_pt;
+          depth = (*row_ptr++) / mp_.k_depth_scaling_factor_;
+          proj_pt(0) = (u - mp_.cx_) * depth / mp_.fx_;
+          proj_pt(1) = (v - mp_.cy_) * depth / mp_.fy_;
+          proj_pt(2) = depth;
 
-        if (u == 320 && v == 240)
-          std::cout << "depth: " << depth << std::endl;
-        md_.proj_points_[md_.proj_points_cnt++] = proj_pt;
+          proj_pt = camera_r * proj_pt + md_.camera_pos_;
+
+          if (u == 320 && v == 240)
+            std::cout << "depth: " << depth << std::endl;
+          md_.proj_points_[md_.proj_points_cnt++] = proj_pt;
+        }
+      }
+    }
+    /* use depth filter */
+    else
+    {
+
+      if (!md_.has_first_depth_)
+        md_.has_first_depth_ = true;
+      else
+      {
+        Eigen::Vector3d pt_cur, pt_world, pt_reproj;
+
+        const double inv_factor = 1.0 / mp_.k_depth_scaling_factor_;
+
+        for (int v = mp_.depth_filter_margin_; v < rows - mp_.depth_filter_margin_; v += mp_.skip_pixel_)
+        {
+          row_ptr = md_.depth_image_.ptr<uint16_t>(v) + mp_.depth_filter_margin_;
+
+          for (int u = mp_.depth_filter_margin_; u < cols - mp_.depth_filter_margin_;
+              u += mp_.skip_pixel_)
+          {
+
+            depth = (*row_ptr) * inv_factor;
+            row_ptr = row_ptr + mp_.skip_pixel_;
+
+            // filter depth
+            // depth += rand_noise_(eng_);
+            // if (depth > 0.01) depth += rand_noise2_(eng_);
+
+            if (*row_ptr == 0)
+            {
+              depth = mp_.max_ray_length_ + 0.1;
+            }
+            else if (depth < mp_.depth_filter_mindist_)
+            {
+              continue;
+            }
+            else if (depth > mp_.depth_filter_maxdist_)
+            {
+              depth = mp_.max_ray_length_ + 0.1;
+            }
+
+            // project to world frame
+            pt_cur(0) = (u - mp_.cx_) * depth / mp_.fx_;
+            pt_cur(1) = (v - mp_.cy_) * depth / mp_.fy_;
+            pt_cur(2) = depth;
+
+            pt_world = camera_r * pt_cur + md_.camera_pos_;
+            // if (!isInMap(pt_world)) {
+            //   pt_world = closetPointInMap(pt_world, md_.camera_pos_);
+            // }
+
+            md_.proj_points_[md_.proj_points_cnt++] = pt_world;
+          }
+        }
       }
     }
   }
-  /* use depth filter */
   else
   {
-
-    if (!md_.has_first_depth_)
-      md_.has_first_depth_ = true;
-    else
+    for (size_t i = 0; i < md_.latest_cloud_.points.size(); ++i)
     {
-      Eigen::Vector3d pt_cur, pt_world, pt_reproj;
-
-      const double inv_factor = 1.0 / mp_.k_depth_scaling_factor_;
-
-      for (int v = mp_.depth_filter_margin_; v < rows - mp_.depth_filter_margin_; v += mp_.skip_pixel_)
-      {
-        row_ptr = md_.depth_image_.ptr<uint16_t>(v) + mp_.depth_filter_margin_;
-
-        for (int u = mp_.depth_filter_margin_; u < cols - mp_.depth_filter_margin_;
-             u += mp_.skip_pixel_)
-        {
-
-          depth = (*row_ptr) * inv_factor;
-          row_ptr = row_ptr + mp_.skip_pixel_;
-
-          // filter depth
-          // depth += rand_noise_(eng_);
-          // if (depth > 0.01) depth += rand_noise2_(eng_);
-
-          if (*row_ptr == 0)
-          {
-            depth = mp_.max_ray_length_ + 0.1;
-          }
-          else if (depth < mp_.depth_filter_mindist_)
-          {
-            continue;
-          }
-          else if (depth > mp_.depth_filter_maxdist_)
-          {
-            depth = mp_.max_ray_length_ + 0.1;
-          }
-
-          // project to world frame
-          pt_cur(0) = (u - mp_.cx_) * depth / mp_.fx_;
-          pt_cur(1) = (v - mp_.cy_) * depth / mp_.fy_;
-          pt_cur(2) = depth;
-
-          pt_world = camera_r * pt_cur + md_.camera_pos_;
-          // if (!isInMap(pt_world)) {
-          //   pt_world = closetPointInMap(pt_world, md_.camera_pos_);
-          // }
-
-          md_.proj_points_[md_.proj_points_cnt++] = pt_world;
-        }
-      }
+      pcl::PointXYZ pt = md_.latest_cloud_.points[i];
+      Eigen::Vector3d p3d;
+      p3d(0) = pt.x, p3d(1) = pt.y, p3d(2) = pt.z;
+      md_.proj_points_[md_.proj_points_cnt++] = p3d;
     }
   }
 }
@@ -310,6 +323,7 @@ void GridMap::projectDepthImage()
 void GridMap::raycastProcess()
 {
   // if (md_.proj_points_.size() == 0)
+  cout << "latest_cloud_.points.size(): " << md_.proj_points_cnt << endl;
   if (md_.proj_points_cnt == 0)
     return;
 
@@ -714,9 +728,12 @@ void GridMap::depthPoseCallback(const sensor_msgs::ImageConstPtr &img,
 
 void GridMap::odomCallback(const nav_msgs::OdometryConstPtr &odom)
 {
-  if (md_.has_first_depth_)
-    return;
-
+  /* get pose */
+  Eigen::Quaterniond body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
+                                                 odom->pose.pose.orientation.x,
+                                                 odom->pose.pose.orientation.y,
+                                                 odom->pose.pose.orientation.z);
+  md_.camera_r_m_ = body_q.toRotationMatrix();
   md_.camera_pos_(0) = odom->pose.pose.position.x;
   md_.camera_pos_(1) = odom->pose.pose.position.y;
   md_.camera_pos_(2) = odom->pose.pose.position.z;
@@ -727,18 +744,18 @@ void GridMap::odomCallback(const nav_msgs::OdometryConstPtr &odom)
 void GridMap::cloudCallback(const livox_ros_driver2::CustomMsg::ConstPtr &img)
 {
 
-  pcl::PointCloud<pcl::PointXYZ> latest_cloud, full_cloud;
-  latest_cloud.clear();
+  pcl::PointCloud<pcl::PointXYZ> full_cloud;
+  md_.latest_cloud_.clear();
   full_cloud.clear();
 
   int plsize = img->point_num;
 
-  latest_cloud.reserve(plsize);
+  md_.latest_cloud_.reserve(plsize);
   full_cloud.resize(plsize);
 
   unsigned int valid_num = 0;
 
-  for (unsigned int i = 1; i < plsize; ++i)
+  for (int i = 1; i < plsize; ++i)
   {
     if (img->points[i].line < 4 && ((img->points[i].tag & 0x30) == 0x10 || (img->points[i].tag & 0x30) == 0x00))
     {
@@ -746,9 +763,8 @@ void GridMap::cloudCallback(const livox_ros_driver2::CustomMsg::ConstPtr &img)
       if (valid_num % 3 == 0)
       {
         Eigen::Vector3d pt_body(img->points[i].x, img->points[i].y, img->points[i].z);
-        cout << md_.camera_r_m_ << endl;
-        cout << md_.camera_pos_ << endl;
-        Eigen::Vector3d pt_world = md_.camera_r_m_ * pt_body + md_.camera_pos_;
+        Eigen::Vector3d lidar_pos = Eigen::Vector3d(0.05, 0.095, 0);
+        Eigen::Vector3d pt_world = md_.camera_r_m_ * pt_body + md_.camera_pos_ + lidar_pos;
         full_cloud[i].x = pt_world(0);
         full_cloud[i].y = pt_world(1);
         full_cloud[i].z = pt_world(2);
@@ -757,7 +773,7 @@ void GridMap::cloudCallback(const livox_ros_driver2::CustomMsg::ConstPtr &img)
               || (abs(full_cloud[i].z - full_cloud[i-1].z) > 1e-7)) 
               && (full_cloud[i].x * full_cloud[i].x + full_cloud[i].y * full_cloud[i].y + full_cloud[i].z * full_cloud[i].z > 0.25) )
         {
-          latest_cloud.push_back(full_cloud[i]);
+          md_.latest_cloud_.push_back(full_cloud[i]);
         }
       }
     }
@@ -771,15 +787,7 @@ void GridMap::cloudCallback(const livox_ros_driver2::CustomMsg::ConstPtr &img)
     return;
   }
 
-  md_.camera_pos_(0) = odom->pose.pose.position.x;
-  md_.camera_pos_(1) = odom->pose.pose.position.y;
-  md_.camera_pos_(2) = odom->pose.pose.position.z;
-  cout << odom->pose.pose.orientation << endl;
-  md_.camera_r_m_ = Eigen::Quaterniond(odom->pose.pose.orientation.w, odom->pose.pose.orientation.x,
-                                       odom->pose.pose.orientation.y, odom->pose.pose.orientation.z)
-                        .toRotationMatrix();
-
-  if (latest_cloud.points.size() == 0)
+  if (md_.latest_cloud_.points.size() == 0)
     return;
 
   if (isnan(md_.camera_pos_(0)) || isnan(md_.camera_pos_(1)) || isnan(md_.camera_pos_(2)))
@@ -804,9 +812,9 @@ void GridMap::cloudCallback(const livox_ros_driver2::CustomMsg::ConstPtr &img)
   max_y = mp_.map_min_boundary_(1);
   max_z = mp_.map_min_boundary_(2);
 
-  for (size_t i = 0; i < latest_cloud.points.size(); ++i)
+  for (size_t i = 0; i < md_.latest_cloud_.points.size(); ++i)
   {
-    pt = latest_cloud.points[i];
+    pt = md_.latest_cloud_.points[i];
     p3d(0) = pt.x, p3d(1) = pt.y, p3d(2) = pt.z;
 
     /* point inside update range */
@@ -814,9 +822,8 @@ void GridMap::cloudCallback(const livox_ros_driver2::CustomMsg::ConstPtr &img)
     Eigen::Vector3i inf_pt; 
 
     if (fabs(devi(0)) < mp_.local_update_range_(0) && fabs(devi(1)) < mp_.local_update_range_(1) &&
-        fabs(devi(2)) < mp_.local_update_range_(2))
+        fabs(devi(2)) < mp_.local_update_range_(2) && fabs(devi(0)) > 0.01 && fabs(devi(1)) > 0.01 && fabs(devi(2)) > 0.01)
     {
-
       /* inflate the point */
       for (int x = -inf_step; x <= inf_step; ++x)
         for (int y = -inf_step; y <= inf_step; ++y)

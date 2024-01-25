@@ -105,6 +105,9 @@ struct MappingData {
   cv::Mat depth_image_;
   int image_cnt_;
 
+  // point cloud data
+  pcl::PointCloud<pcl::PointXYZ> latest_cloud_;
+
   // flags of map state
 
   bool occ_need_update_, local_updated_;
