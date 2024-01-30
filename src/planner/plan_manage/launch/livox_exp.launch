@@ -9,7 +9,7 @@
     <arg name="odom_topic" value="/Odometry" />
 
     <!-- main algorithm params -->
-    <include file="$(find ego_planner)/launch/advanced_param_gazebo.xml">
+    <include file="$(find ego_planner)/launch/advanced_param_exp.xml">
         <arg name="drone_id" value="$(arg drone_id)"/>
         <arg name="map_size_x_" value="$(arg map_size_x)"/>
         <arg name="map_size_y_" value="$(arg map_size_y)"/>
@@ -23,7 +23,7 @@
         <arg name="depth_topic" value="null"/>
         <!-- topic of point cloud measurement, such as from LIDAR  -->
         <!-- don't set camera pose and depth, if you already set this one! -->
-        <arg name="cloud_topic" value="/scan"/>
+        <arg name="cloud_topic" value="/livox/lidar"/>
         <!-- intrinsic params of the depth camera -->
         <arg name="cx" value="320.5"/>
         <arg name="cy" value="240.5"/>
@@ -60,7 +60,6 @@
 
     <!-- trajectory server -->
     <node pkg="ego_planner" name="traj_server" type="traj_server" output="screen">
-        <remap from="/pose_cmd" to="/cmd_pose_enu"/>
         <remap from="~planning/bspline" to="/planning/bspline"/>
         <param name="/traj_server/time_forward" value="1.0" type="double"/>
     </node>
